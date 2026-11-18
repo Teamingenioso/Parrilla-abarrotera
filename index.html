@@ -231,6 +231,13 @@ dialog::backdrop{background:rgba(0,0,0,.18)}
 .vfr{display:block;border:0;width:auto;max-width:100%;height:min(72vh,640px);aspect-ratio:9/16;background:#000}
 /* VIDEO:fin */
 .dnote{margin:16px 0 0;color:var(--dim);font-size:.8rem;line-height:1.45}
+.dswipe{display:none;margin:0 0 4px;color:var(--dim);font-size:.74rem;font-weight:700;letter-spacing:.04em}
+@media (hover:none) and (pointer:coarse){.dswipe{display:block}}
+@keyframes dsn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes dsp{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+.dwrap.sl-n{animation:dsn .22s ease-out}
+.dwrap.sl-p{animation:dsp .22s ease-out}
+@media (prefers-reduced-motion:reduce){.dwrap.sl-n,.dwrap.sl-p{animation:none}}
 .made{border-top:1px solid var(--faint);padding:46px 0 54px;text-align:center;margin-top:56px}
 .made p{margin:0 0 14px;color:var(--dim);font-size:.82rem;text-transform:uppercase;letter-spacing:.14em}
 .made a{display:inline-block}
@@ -333,6 +340,7 @@ dialog::backdrop{background:rgba(0,0,0,.18)}
   <div class="dtop"><div class="dtags" id="dtags"></div><button type="button" class="dx" id="dclose" aria-label="Cerrar">✕</button></div><div class="canales" id="dcanales"></div>
   <h3 id="dt"></h3>
   <p class="dwhen" id="dwhen"></p>
+  <p class="dswipe" id="dswipe"></p>
   <!-- GALERIA:inicio -->
   <div class="dsec dgal" id="dgal" hidden>
    <div class="dlab">Previsualización <small id="dgsub"></small></div>
@@ -549,8 +557,24 @@ function videoPrev(p){
 }
 document.getElementById('det').addEventListener('close',function(){ var f=document.getElementById('vfr'); if(f) f.removeAttribute('src'); });
 /* VIDEO:fin */
-function open(i){
+/* DESLIZAR:inicio */
+var ORD=(function(){
+ var M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+ return P.map(function(p,i){
+  var m=/(\d+)\s+([A-Za-zÁÉÍÓÚáéíóú]+)/.exec(p.when||''), mo=m?M[m[2].toLowerCase().slice(0,3)]:0;
+  return {i:i,k:(mo||0)*100+(m?+m[1]:0)};
+ }).sort(function(a,b){return a.k-b.k||a.i-b.i;}).map(function(x){return x.i;});
+})();
+var cur=-1;
+function paso(dir){
+ var pos=ORD.indexOf(cur), to=pos+dir;
+ if(pos<0||to<0||to>=ORD.length)return false;
+ open(ORD[to],dir); return true;
+}
+/* DESLIZAR:fin */
+function open(i,dir){
  var p=P[i]; if(!p)return;
+ cur=i;
  var tg=document.getElementById('dtags'); tg.textContent=''; var dc=document.getElementById('dcanales'); dc.textContent='';
  tg.appendChild(el('span','pill '+p.cls,(window.etiq?window.etiq(p.day,p.cls).pill:p.estado)));
  tg.appendChild(el('span','kind',p.kind));
@@ -569,10 +593,31 @@ function open(i){
  galeria(p); videoPrev(p);
  if(d.showModal){ if(!d.open) d.showModal(); } else { d.setAttribute('open',''); }
  if(G.n){ var tr=document.getElementById('gtrack'); tr.scrollLeft=0; gmark(0); }
+ var pos=ORD.indexOf(i), sw=document.getElementById('dswipe');
+ if(sw) sw.textContent=(pos>0?'‹ ':'')+'Publicación '+(pos+1)+' de '+ORD.length+' · desliza para cambiar'+(pos<ORD.length-1?' ›':'');
+ d.scrollTop=0;
+ var wr=d.querySelector('.dwrap'); wr.classList.remove('sl-n','sl-p');
+ if(dir){ void wr.offsetWidth; wr.classList.add(dir>0?'sl-n':'sl-p'); }
 }
 document.querySelectorAll('[data-open]').forEach(function(b){b.addEventListener('click',function(){open(+b.getAttribute('data-open'));});});
 document.getElementById('dclose').onclick=function(){d.close();};
 d.addEventListener('click',function(e){if(e.target===d)d.close();});
+/* DESLIZAR: en el celular, desplazar de lado pasa a la siguiente o a la anterior publicación */
+(function(){
+ var tx=0,ty=0,tt=0,ok=false;
+ d.addEventListener('touchstart',function(e){
+  ok=e.touches.length===1 && !(e.target.closest&&e.target.closest('.gal,.gthumbs,.vgal'));
+  if(!ok)return; tx=e.touches[0].clientX; ty=e.touches[0].clientY; tt=Date.now();
+ },{passive:true});
+ d.addEventListener('touchend',function(e){
+  if(!ok)return; ok=false;
+  var t=e.changedTouches[0], dx=t.clientX-tx, dy=t.clientY-ty;
+  if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5||Date.now()-tt>800)return;
+  try{ if(String(window.getSelection()||''))return; }catch(x){}
+  paso(dx<0?1:-1);
+ },{passive:true});
+ d.addEventListener('touchcancel',function(){ok=false;},{passive:true});
+})();
 document.getElementById('dcopy').onclick=function(){
  var b=this, txt=document.getElementById('dcap').textContent;
  var fail=function(){b.textContent='Selecciona el texto y cópialo';};
